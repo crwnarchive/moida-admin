@@ -19,50 +19,38 @@
   .login-box input { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); font-size: 15px; margin-bottom: 12px; }
   .login-box button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
   .login-box button:hover { opacity: .9; }
-
-  /* Stats */
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
   .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
   .stat-card .label { font-size: 13px; color: var(--sub); margin-bottom: 6px; }
   .stat-card .value { font-size: 28px; font-weight: 800; }
-
-  /* Tabs */
   .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
   .tab { padding: 10px 20px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--sub); cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; }
   .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
   .tab:hover { border-color: var(--primary); }
-
-  /* Table */
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; padding: 12px 16px; font-size: 12px; color: var(--sub); text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border); }
   td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
   tr:hover { background: rgba(49,130,246,.06); }
-
   .badge { display: inline-block; padding: 3px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
   .badge-leader { background: rgba(49,130,246,.15); color: var(--primary); }
   .badge-treasurer { background: rgba(52,199,89,.15); color: var(--success); }
   .badge-member { background: rgba(139,143,158,.15); color: var(--sub); }
   .badge-active { background: rgba(52,199,89,.15); color: var(--success); }
   .badge-inactive { background: rgba(255,68,88,.15); color: var(--danger); }
-
   .btn { padding: 6px 14px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
   .btn:hover { opacity: .85; }
   .btn-danger { background: var(--danger); color: #fff; }
   .btn-primary { background: var(--primary); color: #fff; }
   .btn-sm { padding: 4px 10px; font-size: 12px; }
-
   .actions { display: flex; gap: 6px; }
   .empty { text-align: center; padding: 60px 20px; color: var(--sub); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--border); padding: 12px 24px; border-radius: 12px; font-size: 14px; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
-
-  /* Modal */
   .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.6); z-index: 100; display: flex; align-items: center; justify-content: center; }
   .modal { background: var(--card); border-radius: 16px; padding: 28px; max-width: 420px; width: 90%; }
   .modal h3 { margin-bottom: 16px; }
   .modal p { color: var(--sub); font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
   .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
-
   .refresh-btn { background: none; border: 1px solid var(--border); color: var(--sub); padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; }
   .refresh-btn:hover { border-color: var(--primary); color: var(--primary); }
   .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
@@ -74,22 +62,52 @@
 
 <script>
 const SUPABASE_URL = 'https://cavwhdccswjfkutvuqtf.supabase.co';
-const PROJECT_REF = 'cavwhdccswjfkutvuqtf';
-const API_URL = 'https://api.supabase.com/v1/projects/' + PROJECT_REF + '/database/query';
+const ADMIN_PASSWORD = 'moida2026!';
+const _k = atob('ZXlKaGJHY2lPaUpJVXpJMU5pSXNJblI1Y0NJNklrcFhWQ0o5LmV5SnBjM01pT2lKemRYQmhZbUZ6WlNJc0luSmxaaUk2SW1OaGRuZG9aR05qYzNkcVptdDFkSFoxY1hSbUlpd2ljbTlzWlNJNkluTmxjblpwWTJWZmNtOXNaU0lzSW1saGRDSTZNVGM0TURRM01EUTBOU3dpWlhod0lqb3lNRGsyTURRMk5EUTFmUS5RQ3NqMGVTdVZ3dnZnbnA2QVlLRjFuMko1bFhFNHhyLVZ3ODVzeGdrZXVB');
 
-let TOKEN = localStorage.getItem('moida_admin_token') || '';
+let SERVICE_KEY = localStorage.getItem('moida_admin_v2') === 'true' ? _k : '';
 let currentTab = 'dashboard';
 
-// ── API ──
-async function dbQuery(sql) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: sql })
+// ── REST API ──
+async function restGet(table, query) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + query, {
+    headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
   });
-  const data = await res.json();
-  if (data.message) throw new Error(data.message);
-  return data;
+  if (!res.ok) throw new Error('API error: ' + res.status);
+  return await res.json();
+}
+
+async function restDelete(table, match) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + match, {
+    method: 'DELETE',
+    headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
+  });
+  if (!res.ok) throw new Error('삭제 실패: ' + res.status);
+}
+
+async function restPatch(table, match, body) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + match, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY,
+      'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('수정 실패: ' + res.status);
+}
+
+async function restRpc(fn, params) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+    method: 'POST',
+    headers: {
+      'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params || {})
+  });
+  if (!res.ok) throw new Error('RPC error: ' + res.status);
+  return await res.json();
 }
 
 // ── Toast ──
@@ -122,20 +140,23 @@ function renderLogin() {
   document.getElementById('app').innerHTML = `
     <div class="login-box">
       <h1><span>모이다</span> 관리자</h1>
-      <p style="color:var(--sub);margin-bottom:24px">Supabase Management API 토큰을 입력하세요</p>
-      <input type="password" id="tokenInput" placeholder="sbp_xxxxxxxxx..." value="${TOKEN}">
+      <p style="color:var(--sub);margin-bottom:24px">관리자 비밀번호를 입력하세요</p>
+      <input type="password" id="pwInput" placeholder="비밀번호">
       <button onclick="tryLogin()">로그인</button>
     </div>`;
+  document.getElementById('pwInput').addEventListener('keydown', e => { if(e.key==='Enter') tryLogin(); });
 }
 
 async function tryLogin() {
-  TOKEN = document.getElementById('tokenInput').value.trim();
+  const pw = document.getElementById('pwInput').value.trim();
+  if (pw !== ADMIN_PASSWORD) { toast('비밀번호가 틀렸어요'); return; }
+  SERVICE_KEY = _k;
   try {
-    await dbQuery('SELECT 1;');
-    localStorage.setItem('moida_admin_token', TOKEN);
+    await restGet('groups', 'select=id&limit=1');
+    localStorage.setItem('moida_admin_v2', 'true');
     renderApp();
   } catch (e) {
-    toast('토큰이 올바르지 않아요: ' + e.message);
+    toast('연결에 실패했어요: ' + e.message);
   }
 }
 
@@ -176,33 +197,32 @@ async function renderApp() {
 }
 
 function switchTab(tab) { currentTab = tab; renderApp(); }
-function logout() { localStorage.removeItem('moida_admin_token'); TOKEN = ''; renderLogin(); }
+function logout() { localStorage.removeItem('moida_admin_v2'); SERVICE_KEY = ''; renderLogin(); }
 
 // ── Dashboard ──
 async function renderDashboard() {
-  const [users, groups, members, payments, celebrations] = await Promise.all([
-    dbQuery('SELECT count(*) as cnt FROM auth.users;'),
-    dbQuery('SELECT count(*) as cnt FROM groups;'),
-    dbQuery('SELECT count(*) as cnt FROM members;'),
-    dbQuery('SELECT count(*) as cnt FROM payments;'),
-    dbQuery("SELECT count(*) as cnt FROM celebrations;").catch(() => [{ cnt: 0 }]),
+  const [groups, members, payments, celebrations, profiles] = await Promise.all([
+    restGet('groups', 'select=id'),
+    restGet('members', 'select=id'),
+    restGet('payments', 'select=id'),
+    restGet('celebrations', 'select=id').catch(() => []),
+    restGet('profiles', 'select=id'),
   ]);
 
-  const paidQ = await dbQuery("SELECT count(*) as cnt FROM payments WHERE status = 'paid';").catch(() => [{ cnt: 0 }]);
-  const unpaidQ = await dbQuery("SELECT count(*) as cnt FROM payments WHERE status = 'unpaid';").catch(() => [{ cnt: 0 }]);
+  const paidArr = await restGet('payments', 'select=id&status=eq.paid').catch(() => []);
+  const unpaidArr = await restGet('payments', 'select=id&status=eq.unpaid').catch(() => []);
 
-  // Recent members
-  const recent = await dbQuery("SELECT m.name, m.role, m.joined_at, g.name as group_name FROM members m JOIN groups g ON g.id = m.group_id ORDER BY m.joined_at DESC LIMIT 5;");
+  const recent = await restGet('members', 'select=name,role,joined_at,group:groups(name)&order=joined_at.desc&limit=5');
 
   document.getElementById('content').innerHTML = `
     <div class="stats">
-      <div class="stat-card"><div class="label">총 유저</div><div class="value">${users[0].cnt}</div></div>
-      <div class="stat-card"><div class="label">총 모임</div><div class="value">${groups[0].cnt}</div></div>
-      <div class="stat-card"><div class="label">총 멤버십</div><div class="value">${members[0].cnt}</div></div>
-      <div class="stat-card"><div class="label">납부 기록</div><div class="value">${payments[0].cnt}</div></div>
-      <div class="stat-card"><div class="label">납부 완료</div><div class="value" style="color:var(--success)">${paidQ[0].cnt}</div></div>
-      <div class="stat-card"><div class="label">미납</div><div class="value" style="color:var(--danger)">${unpaidQ[0].cnt}</div></div>
-      <div class="stat-card"><div class="label">경조사</div><div class="value">${celebrations[0].cnt}</div></div>
+      <div class="stat-card"><div class="label">총 유저</div><div class="value">${profiles.length}</div></div>
+      <div class="stat-card"><div class="label">총 모임</div><div class="value">${groups.length}</div></div>
+      <div class="stat-card"><div class="label">총 멤버십</div><div class="value">${members.length}</div></div>
+      <div class="stat-card"><div class="label">납부 기록</div><div class="value">${payments.length}</div></div>
+      <div class="stat-card"><div class="label">납부 완료</div><div class="value" style="color:var(--success)">${paidArr.length}</div></div>
+      <div class="stat-card"><div class="label">미납</div><div class="value" style="color:var(--danger)">${unpaidArr.length}</div></div>
+      <div class="stat-card"><div class="label">경조사</div><div class="value">${celebrations.length}</div></div>
     </div>
     <h3 style="margin-bottom:12px">최근 가입 멤버</h3>
     <div class="table-wrap"><table>
@@ -210,44 +230,37 @@ async function renderDashboard() {
       ${recent.map(r => `<tr>
         <td>${r.name}</td>
         <td><span class="badge badge-${r.role}">${r.role}</span></td>
-        <td>${r.group_name}</td>
+        <td>${r.group?.name || '-'}</td>
         <td>${new Date(r.joined_at).toLocaleDateString('ko')}</td>
       </tr>`).join('')}
     </table></div>`;
 }
 
-// ── Users ──
+// ── Users (profiles) ──
 async function renderUsers() {
-  const users = await dbQuery("SELECT id, email, created_at, last_sign_in_at FROM auth.users ORDER BY created_at DESC;");
-  // Get profiles
-  const profiles = await dbQuery("SELECT id, nickname, full_name, gender, birth_date FROM profiles;").catch(() => []);
-  const profileMap = {};
-  profiles.forEach(p => profileMap[p.id] = p);
+  const profiles = await restGet('profiles', 'select=id,nickname,full_name,gender,birth_date,created_at&order=created_at.desc');
 
   document.getElementById('content').innerHTML = `
     <div class="table-wrap"><table>
-      <tr><th>닉네임</th><th>이름</th><th>이메일</th><th>가입일</th><th>최근 로그인</th><th>액션</th></tr>
-      ${users.map(u => {
-        const p = profileMap[u.id] || {};
-        return `<tr>
-          <td>${p.nickname || '-'}</td>
-          <td>${p.full_name || '-'}</td>
-          <td style="font-size:12px;color:var(--sub)">${u.email || '-'}</td>
-          <td>${new Date(u.created_at).toLocaleDateString('ko')}</td>
-          <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('ko') : '-'}</td>
-          <td><div class="actions">
-            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}','${p.nickname||u.email||u.id}')">삭제</button>
-          </div></td>
-        </tr>`;
-      }).join('')}
+      <tr><th>닉네임</th><th>이름</th><th>성별</th><th>생년월일</th><th>가입일</th><th>액션</th></tr>
+      ${profiles.map(p => `<tr>
+        <td>${p.nickname || '-'}</td>
+        <td>${p.full_name || '-'}</td>
+        <td>${p.gender || '-'}</td>
+        <td>${p.birth_date || '-'}</td>
+        <td>${new Date(p.created_at).toLocaleDateString('ko')}</td>
+        <td><div class="actions">
+          <button class="btn btn-danger btn-sm" onclick="deleteUser('${p.id}','${p.nickname||p.full_name||p.id}')">삭제</button>
+        </div></td>
+      </tr>`).join('')}
     </table></div>`;
 }
 
 async function deleteUser(id, name) {
   showConfirm('유저 삭제', `<b>${name}</b>을 정말 삭제하시겠어요?<br>관련된 모든 데이터가 삭제됩니다.`, async () => {
     try {
-      await dbQuery(`DELETE FROM members WHERE user_id = '${id}';`);
-      await dbQuery(`DELETE FROM auth.users WHERE id = '${id}';`);
+      await restDelete('members', 'user_id=eq.' + id);
+      await restDelete('profiles', 'id=eq.' + id);
       toast('유저 삭제 완료');
       renderApp();
     } catch(e) { toast('삭제 실패: ' + e.message); }
@@ -256,11 +269,7 @@ async function deleteUser(id, name) {
 
 // ── Groups ──
 async function renderGroups() {
-  const groups = await dbQuery(`
-    SELECT g.*, 
-      (SELECT count(*) FROM members m WHERE m.group_id = g.id AND m.status = 'active') as member_count
-    FROM groups g ORDER BY g.created_at DESC;
-  `);
+  const groups = await restGet('groups', 'select=*,members(id)&order=created_at.desc');
 
   document.getElementById('content').innerHTML = `
     <div class="table-wrap"><table>
@@ -268,11 +277,10 @@ async function renderGroups() {
       ${groups.map(g => `<tr>
         <td><strong>${g.name}</strong></td>
         <td><code style="background:var(--border);padding:2px 8px;border-radius:6px">${g.invite_code}</code></td>
-        <td>${Number(g.fee_amount).toLocaleString()}원</td>
-        <td>${g.member_count}명</td>
+        <td>${Number(g.fee_amount||0).toLocaleString()}원</td>
+        <td>${(g.members||[]).length}명</td>
         <td>${new Date(g.created_at).toLocaleDateString('ko')}</td>
         <td><div class="actions">
-          <button class="btn btn-primary btn-sm" onclick="switchTab('members');renderApp()">멤버</button>
           <button class="btn btn-danger btn-sm" onclick="deleteGroup('${g.id}','${g.name}')">삭제</button>
         </div></td>
       </tr>`).join('')}
@@ -282,7 +290,9 @@ async function renderGroups() {
 async function deleteGroup(id, name) {
   showConfirm('모임 삭제', `<b>${name}</b> 모임을 삭제하시겠어요?<br>모든 멤버, 납부, 장부 기록이 함께 삭제됩니다.`, async () => {
     try {
-      await dbQuery(`DELETE FROM groups WHERE id = '${id}';`);
+      await restDelete('payments', 'group_id=eq.' + id);
+      await restDelete('members', 'group_id=eq.' + id);
+      await restDelete('groups', 'id=eq.' + id);
       toast('모임 삭제 완료');
       renderApp();
     } catch(e) { toast('삭제 실패: ' + e.message); }
@@ -291,22 +301,15 @@ async function deleteGroup(id, name) {
 
 // ── Members ──
 async function renderMembers() {
-  const members = await dbQuery(`
-    SELECT m.*, g.name as group_name,
-      p.nickname, p.full_name
-    FROM members m
-    JOIN groups g ON g.id = m.group_id
-    LEFT JOIN profiles p ON p.id = m.user_id
-    ORDER BY g.name, m.role, m.name;
-  `);
+  const members = await restGet('members', 'select=*,group:groups(name),profile:profiles(nickname,full_name)&order=name');
 
   document.getElementById('content').innerHTML = `
     <div class="table-wrap"><table>
       <tr><th>이름</th><th>닉네임</th><th>모임</th><th>역할</th><th>상태</th><th>가입일</th><th>액션</th></tr>
       ${members.map(m => `<tr>
         <td>${m.name}</td>
-        <td>${m.nickname || '-'}</td>
-        <td>${m.group_name}</td>
+        <td>${m.profile?.nickname || '-'}</td>
+        <td>${m.group?.name || '-'}</td>
         <td><span class="badge badge-${m.role}">${m.role}</span></td>
         <td><span class="badge badge-${m.status}">${m.status}</span></td>
         <td>${new Date(m.joined_at).toLocaleDateString('ko')}</td>
@@ -320,7 +323,7 @@ async function renderMembers() {
 async function deleteMember(id, name) {
   showConfirm('멤버 탈퇴', `<b>${name}</b>을 모임에서 내보내시겠어요?`, async () => {
     try {
-      await dbQuery(`DELETE FROM members WHERE id = '${id}';`);
+      await restDelete('members', 'id=eq.' + id);
       toast('멤버 탈퇴 처리 완료');
       renderApp();
     } catch(e) { toast('실패: ' + e.message); }
@@ -329,13 +332,7 @@ async function deleteMember(id, name) {
 
 // ── Payments ──
 async function renderPayments() {
-  const payments = await dbQuery(`
-    SELECT p.*, m.name as member_name, g.name as group_name
-    FROM payments p
-    JOIN members m ON m.id = p.member_id
-    JOIN groups g ON g.id = p.group_id
-    ORDER BY p.month DESC, m.name;
-  `).catch(() => []);
+  const payments = await restGet('payments', 'select=*,member:members(name),group:groups(name)&order=month.desc');
 
   if (!payments.length) {
     document.getElementById('content').innerHTML = '<div class="empty">납부 기록이 없어요</div>';
@@ -346,22 +343,22 @@ async function renderPayments() {
     <div class="table-wrap"><table>
       <tr><th>회원</th><th>모임</th><th>월</th><th>금액</th><th>상태</th><th>액션</th></tr>
       ${payments.map(p => `<tr>
-        <td>${p.member_name}</td>
-        <td>${p.group_name}</td>
+        <td>${p.member?.name || '-'}</td>
+        <td>${p.group?.name || '-'}</td>
         <td>${p.month}</td>
         <td>${Number(p.amount).toLocaleString()}원</td>
         <td><span class="badge badge-${p.status === 'paid' ? 'active' : p.status === 'pending' ? 'leader' : 'inactive'}">${p.status}</span></td>
         <td><div class="actions">
-          <button class="btn btn-primary btn-sm" onclick="updatePaymentStatus('${p.id}','paid')">납부</button>
-          <button class="btn btn-sm" style="background:var(--warn);color:#333" onclick="updatePaymentStatus('${p.id}','unpaid')">미납</button>
+          <button class="btn btn-primary btn-sm" onclick="updatePayment('${p.id}','paid')">납부</button>
+          <button class="btn btn-sm" style="background:var(--warn);color:#333" onclick="updatePayment('${p.id}','unpaid')">미납</button>
         </div></td>
       </tr>`).join('')}
     </table></div>`;
 }
 
-async function updatePaymentStatus(id, status) {
+async function updatePayment(id, status) {
   try {
-    await dbQuery(`UPDATE payments SET status = '${status}' WHERE id = '${id}';`);
+    await restPatch('payments', 'id=eq.' + id, { status });
     toast('상태 변경 완료');
     renderApp();
   } catch(e) { toast('실패: ' + e.message); }
@@ -369,13 +366,7 @@ async function updatePaymentStatus(id, status) {
 
 // ── Celebrations ──
 async function renderCelebrations() {
-  const celebrations = await dbQuery(`
-    SELECT c.*, g.name as group_name, m.name as member_name
-    FROM celebrations c
-    JOIN groups g ON g.id = c.group_id
-    LEFT JOIN members m ON m.id = c.member_id
-    ORDER BY c.date DESC;
-  `).catch(() => []);
+  const celebrations = await restGet('celebrations', 'select=*,group:groups(name),member:members(name)&order=date.desc').catch(() => []);
 
   if (!celebrations.length) {
     document.getElementById('content').innerHTML = '<div class="empty">경조사가 없어요</div>';
@@ -387,8 +378,8 @@ async function renderCelebrations() {
       <tr><th>유형</th><th>회원</th><th>모임</th><th>날짜</th><th>메모</th><th>액션</th></tr>
       ${celebrations.map(c => `<tr>
         <td>${c.type || '-'}</td>
-        <td>${c.member_name || '-'}</td>
-        <td>${c.group_name}</td>
+        <td>${c.member?.name || '-'}</td>
+        <td>${c.group?.name || '-'}</td>
         <td>${c.date ? new Date(c.date).toLocaleDateString('ko') : '-'}</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${c.memo || '-'}</td>
         <td><button class="btn btn-danger btn-sm" onclick="deleteCelebration('${c.id}')">삭제</button></td>
@@ -399,7 +390,7 @@ async function renderCelebrations() {
 async function deleteCelebration(id) {
   showConfirm('경조사 삭제', '이 경조사를 삭제하시겠어요?', async () => {
     try {
-      await dbQuery(`DELETE FROM celebrations WHERE id = '${id}';`);
+      await restDelete('celebrations', 'id=eq.' + id);
       toast('삭제 완료');
       renderApp();
     } catch(e) { toast('실패: ' + e.message); }
@@ -407,7 +398,7 @@ async function deleteCelebration(id) {
 }
 
 // ── Init ──
-if (TOKEN) { renderApp(); } else { renderLogin(); }
+if (SERVICE_KEY) { renderApp(); } else { renderLogin(); }
 </script>
 </body>
 </html>
