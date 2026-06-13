@@ -201,12 +201,13 @@ function logout() { localStorage.removeItem('moida_admin_v2'); SERVICE_KEY = '';
 
 // ── Dashboard ──
 async function renderDashboard() {
-  const [groups, members, payments, celebrations, profiles] = await Promise.all([
+  const [groups, members, payments, celebrations, profiles, activeUsers] = await Promise.all([
     restGet('groups', 'select=id'),
     restGet('members', 'select=id'),
     restGet('payments', 'select=id'),
     restGet('celebrations', 'select=id').catch(() => []),
     restGet('profiles', 'select=id'),
+    restRpc('get_active_users').catch(() => ({dau:'-',wau:'-',mau:'-',total:'-'})),
   ]);
 
   const paidArr = await restGet('payments', 'select=id&status=eq.paid').catch(() => []);
@@ -215,6 +216,13 @@ async function renderDashboard() {
   const recent = await restGet('members', 'select=name,role,joined_at,group:groups(name)&order=joined_at.desc&limit=5');
 
   document.getElementById('content').innerHTML = `
+    <h3 style="margin-bottom:12px">📊 활성 사용자</h3>
+    <div class="stats" style="margin-bottom:24px">
+      <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">DAU <span style="font-size:11px;color:var(--sub)">(오늘)</span></div><div class="value" style="color:var(--primary)">${activeUsers.dau}</div></div>
+      <div class="stat-card" style="border-left:3px solid var(--success)"><div class="label">WAU <span style="font-size:11px;color:var(--sub)">(7일)</span></div><div class="value" style="color:var(--success)">${activeUsers.wau}</div></div>
+      <div class="stat-card" style="border-left:3px solid var(--warn)"><div class="label">MAU <span style="font-size:11px;color:var(--sub)">(30일)</span></div><div class="value" style="color:var(--warn)">${activeUsers.mau}</div></div>
+    </div>
+    <h3 style="margin-bottom:12px">📈 전체 현황</h3>
     <div class="stats">
       <div class="stat-card"><div class="label">총 유저</div><div class="value">${profiles.length}</div></div>
       <div class="stat-card"><div class="label">총 모임</div><div class="value">${groups.length}</div></div>
