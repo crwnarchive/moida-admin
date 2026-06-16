@@ -23,6 +23,34 @@
   .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
   .stat-card .label { font-size: 13px; color: var(--sub); margin-bottom: 6px; }
   .stat-card .value { font-size: 28px; font-weight: 800; }
+  .stat-card .trend { font-size: 12px; margin-top: 4px; }
+  .trend-up { color: var(--success); }
+  .trend-down { color: var(--danger); }
+  .section-title { font-size: 16px; font-weight: 700; margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title .emoji { font-size: 18px; }
+  .pill-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .pill { padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; }
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; margin-bottom: 8px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center; flex: 1; height: 100%; justify-content: flex-end; }
+  .bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 2px; transition: height .3s; }
+  .bar-label { font-size: 10px; color: var(--sub); margin-top: 4px; }
+  .bar-value { font-size: 10px; color: var(--text); margin-bottom: 2px; }
+  .retention-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .retention-item { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; text-align: center; flex: 1; min-width: 100px; }
+  .retention-circle { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 18px; font-weight: 800; }
+  .retention-label { font-size: 12px; color: var(--sub); }
+  .dist-bar { display: flex; height: 24px; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .dist-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; min-width: 20px; }
+  .dist-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--sub); }
+  .dist-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .engage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .engage-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .engage-card .num { font-size: 22px; font-weight: 800; }
+  .engage-card .lbl { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .alert-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .alert-icon { font-size: 24px; }
+  .alert-num { font-size: 20px; font-weight: 800; }
+  .alert-label { font-size: 12px; color: var(--sub); }
   .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
   .tab { padding: 10px 20px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--sub); cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; }
   .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
@@ -201,47 +229,161 @@ function logout() { localStorage.removeItem('moida_admin_v2'); SERVICE_KEY = '';
 
 // ── Dashboard ──
 async function renderDashboard() {
-  const [groups, members, payments, celebrations, profiles, activeUsers] = await Promise.all([
-    restGet('groups', 'select=id'),
-    restGet('members', 'select=id'),
-    restGet('payments', 'select=id'),
-    restGet('celebrations', 'select=id').catch(() => []),
-    restGet('profiles', 'select=id'),
-    restRpc('get_active_users').catch(() => ({dau:'-',wau:'-',mau:'-',total:'-'})),
-  ]);
+  const d = await restRpc('get_admin_dashboard');
 
-  const paidArr = await restGet('payments', 'select=id&status=eq.paid').catch(() => []);
-  const unpaidArr = await restGet('payments', 'select=id&status=eq.unpaid').catch(() => []);
+  // Helpers
+  function trend(curr, prev, label) {
+    if (!prev) return '';
+    const diff = curr - prev;
+    if (diff === 0) return `<div class="trend" style="color:var(--sub)">전주 동일</div>`;
+    const cls = diff > 0 ? 'trend-up' : 'trend-down';
+    const arrow = diff > 0 ? '↑' : '↓';
+    return `<div class="trend ${cls}">${arrow} ${Math.abs(diff)} ${label}</div>`;
+  }
 
-  const recent = await restGet('members', 'select=name,role,joined_at,group:groups(name)&order=joined_at.desc&limit=5');
+  function barChart(data, color) {
+    if (!data || !data.length) return '<div style="color:var(--sub);font-size:13px">데이터 없음</div>';
+    const max = Math.max(...data.map(d => d.count), 1);
+    return `<div class="bar-chart">${data.map(d => {
+      const h = Math.max((d.count / max) * 100, 2);
+      const dt = new Date(d.date);
+      const label = (dt.getMonth()+1) + '/' + dt.getDate();
+      return `<div class="bar-col"><div class="bar-value">${d.count}</div><div class="bar" style="height:${h}%;background:${color}"></div><div class="bar-label">${label}</div></div>`;
+    }).join('')}</div>`;
+  }
+
+  function retentionColor(v) {
+    if (v >= 30) return 'var(--success)';
+    if (v >= 15) return 'var(--warn)';
+    return 'var(--danger)';
+  }
+
+  const inactivePercent = d.total_users > 0 ? Math.round(d.inactive_7d / d.total_users * 100) : 0;
+  const activePercent = d.total_groups > 0 ? Math.round(d.active_groups_7d / d.total_groups * 100) : 0;
+
+  // Group size distribution
+  const gs = d.group_size_distribution || {solo:0,small:0,medium:0,large:0};
+  const gsTotal = gs.solo + gs.small + gs.medium + gs.large || 1;
 
   document.getElementById('content').innerHTML = `
-    <h3 style="margin-bottom:12px">📊 활성 사용자</h3>
-    <div class="stats" style="margin-bottom:24px">
-      <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">DAU <span style="font-size:11px;color:var(--sub)">(오늘)</span></div><div class="value" style="color:var(--primary)">${activeUsers.dau}</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--success)"><div class="label">WAU <span style="font-size:11px;color:var(--sub)">(7일)</span></div><div class="value" style="color:var(--success)">${activeUsers.wau}</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--warn)"><div class="label">MAU <span style="font-size:11px;color:var(--sub)">(30일)</span></div><div class="value" style="color:var(--warn)">${activeUsers.mau}</div></div>
-    </div>
-    <h3 style="margin-bottom:12px">📈 전체 현황</h3>
+    <!-- 상단 요약 카드 -->
     <div class="stats">
-      <div class="stat-card"><div class="label">총 유저</div><div class="value">${profiles.length}</div></div>
-      <div class="stat-card"><div class="label">총 모임</div><div class="value">${groups.length}</div></div>
-      <div class="stat-card"><div class="label">총 멤버십</div><div class="value">${members.length}</div></div>
-      <div class="stat-card"><div class="label">납부 기록</div><div class="value">${payments.length}</div></div>
-      <div class="stat-card"><div class="label">납부 완료</div><div class="value" style="color:var(--success)">${paidArr.length}</div></div>
-      <div class="stat-card"><div class="label">미납</div><div class="value" style="color:var(--danger)">${unpaidArr.length}</div></div>
-      <div class="stat-card"><div class="label">경조사</div><div class="value">${celebrations.length}</div></div>
+      <div class="stat-card">
+        <div class="label">총 가입자</div>
+        <div class="value">${d.total_users}</div>
+        <div class="trend" style="color:var(--sub)">오늘 +${d.signups_today} · 이번주 +${d.signups_this_week}</div>
+        ${trend(d.signups_this_week, d.signups_prev_week, 'vs 전주')}
+      </div>
+      <div class="stat-card">
+        <div class="label">모임 수</div>
+        <div class="value">${d.total_groups}</div>
+        <div class="trend" style="color:var(--sub)">이번주 +${d.groups_this_week}</div>
+        ${trend(d.groups_this_week, d.groups_prev_week, 'vs 전주')}
+      </div>
+      <div class="stat-card">
+        <div class="label">활성 모임 (7일)</div>
+        <div class="value" style="color:${activePercent >= 50 ? 'var(--success)' : 'var(--warn)'}">${d.active_groups_7d}<span style="font-size:14px;color:var(--sub)"> / ${d.total_groups}</span></div>
+        <div class="trend" style="color:var(--sub)">${activePercent}%</div>
+      </div>
+      <div class="stat-card" style="${inactivePercent > 20 ? 'border-color:var(--danger)' : ''}">
+        <div class="label">7일 미접속 ⚠️</div>
+        <div class="value" style="color:${inactivePercent > 20 ? 'var(--danger)' : 'var(--warn)'}">${d.inactive_7d}</div>
+        <div class="trend" style="color:var(--sub)">${inactivePercent}% of total</div>
+      </div>
     </div>
-    <h3 style="margin-bottom:12px">최근 가입 멤버</h3>
-    <div class="table-wrap"><table>
-      <tr><th>이름</th><th>역할</th><th>모임</th><th>가입일</th></tr>
-      ${recent.map(r => `<tr>
-        <td>${r.name}</td>
-        <td><span class="badge badge-${r.role}">${r.role}</span></td>
-        <td>${r.group?.name || '-'}</td>
-        <td>${new Date(r.joined_at).toLocaleDateString('ko')}</td>
-      </tr>`).join('')}
-    </table></div>`;
+
+    <!-- DAU / WAU / MAU -->
+    <div class="section-title"><span class="emoji">📊</span> 활성 사용자</div>
+    <div class="pill-row">
+      <span class="pill" style="background:rgba(49,130,246,.15);color:var(--primary)">DAU ${d.dau}</span>
+      <span class="pill" style="background:rgba(52,199,89,.15);color:var(--success)">WAU ${d.wau}</span>
+      <span class="pill" style="background:rgba(255,214,102,.15);color:var(--warn)">MAU ${d.mau}</span>
+    </div>
+
+    <!-- 7일 가입 추이 -->
+    <div class="section-title"><span class="emoji">📈</span> 7일 가입 추이</div>
+    ${barChart(d.daily_signups_7d, 'var(--primary)')}
+
+    <!-- 리텐션 -->
+    <div class="section-title"><span class="emoji">🔄</span> 리텐션</div>
+    <div class="retention-row">
+      <div class="retention-item">
+        <div class="retention-circle" style="background:${retentionColor(d.retention_d1)}22;color:${retentionColor(d.retention_d1)}">${d.retention_d1}%</div>
+        <div class="retention-label">D1</div>
+      </div>
+      <div class="retention-item">
+        <div class="retention-circle" style="background:${retentionColor(d.retention_d7)}22;color:${retentionColor(d.retention_d7)}">${d.retention_d7}%</div>
+        <div class="retention-label">D7</div>
+      </div>
+      <div class="retention-item">
+        <div class="retention-circle" style="background:${retentionColor(d.retention_d30)}22;color:${retentionColor(d.retention_d30)}">${d.retention_d30}%</div>
+        <div class="retention-label">D30</div>
+      </div>
+    </div>
+
+    <!-- 모임 건강도 -->
+    <div class="section-title"><span class="emoji">🏠</span> 모임 건강도</div>
+    <div class="stat-card" style="margin-bottom:12px">
+      <div class="label">평균 모임당 멤버 수</div>
+      <div class="value">${d.avg_members_per_group}명</div>
+    </div>
+    <div class="stat-card" style="margin-bottom:12px">
+      <div class="label" style="margin-bottom:10px">모임 규모 분포</div>
+      <div class="dist-bar">
+        <div class="dist-seg" style="width:${gs.solo/gsTotal*100}%;background:#8B5CF6">${gs.solo}</div>
+        <div class="dist-seg" style="width:${gs.small/gsTotal*100}%;background:var(--primary)">${gs.small}</div>
+        <div class="dist-seg" style="width:${gs.medium/gsTotal*100}%;background:var(--success)">${gs.medium}</div>
+        <div class="dist-seg" style="width:${gs.large/gsTotal*100}%;background:var(--warn)">${gs.large}</div>
+      </div>
+      <div class="dist-legend">
+        <span><span class="dist-dot" style="background:#8B5CF6"></span>1명</span>
+        <span><span class="dist-dot" style="background:var(--primary)"></span>2~5명</span>
+        <span><span class="dist-dot" style="background:var(--success)"></span>6~15명</span>
+        <span><span class="dist-dot" style="background:var(--warn)"></span>16명+</span>
+      </div>
+    </div>
+
+    <!-- 참여도 -->
+    <div class="section-title"><span class="emoji">💬</span> 이번주 참여도</div>
+    <div class="engage-grid">
+      <div class="engage-card"><div class="num" style="color:var(--primary)">${d.messages_this_week}</div><div class="lbl">채팅 메시지</div></div>
+      <div class="engage-card"><div class="num" style="color:var(--success)">${d.posts_this_week}</div><div class="lbl">게시글</div></div>
+      <div class="engage-card"><div class="num" style="color:var(--warn)">${d.events_this_week}</div><div class="lbl">일정</div></div>
+      <div class="engage-card"><div class="num" style="color:#8B5CF6">${d.transactions_this_week}</div><div class="lbl">회비 기록</div></div>
+    </div>
+
+    <!-- 이탈 경고 -->
+    <div class="section-title"><span class="emoji">⚠️</span> 이탈 경고</div>
+    <div class="alert-card">
+      <div class="alert-icon">🚪</div>
+      <div><div class="alert-num">${d.left_members_this_week}</div><div class="alert-label">이번주 탈퇴</div></div>
+    </div>
+    <div class="alert-card">
+      <div class="alert-icon">📅</div>
+      <div><div class="alert-num">${d.left_members_this_month}</div><div class="alert-label">이번달 탈퇴</div></div>
+    </div>
+    <div class="alert-card" style="${inactivePercent > 20 ? 'border-color:var(--danger)' : ''}">
+      <div class="alert-icon">😴</div>
+      <div><div class="alert-num" style="color:${inactivePercent > 20 ? 'var(--danger)' : 'var(--warn)'}">${d.inactive_7d}</div><div class="alert-label">7일 미접속 (${inactivePercent}%)</div></div>
+    </div>
+
+    <!-- 7일 메시지 추이 -->
+    <div class="section-title"><span class="emoji">💬</span> 7일 메시지 추이</div>
+    ${barChart(d.daily_messages_7d, '#8B5CF6')}
+
+    <!-- 카테고리 분포 -->
+    ${d.category_distribution && d.category_distribution.length ? `
+    <div class="section-title"><span class="emoji">🏷</span> 모임 카테고리 분포</div>
+    ${d.category_distribution.map(c => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:13px;min-width:80px">${c.category}</span>
+        <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+          <div style="width:${Math.min(c.count/Math.max(...d.category_distribution.map(x=>x.count))*100,100)}%;height:100%;background:var(--primary);border-radius:4px"></div>
+        </div>
+        <span style="font-size:12px;color:var(--sub)">${c.count}</span>
+      </div>
+    `).join('')}` : ''}
+  `;
 }
 
 // ── Users (profiles) ──
