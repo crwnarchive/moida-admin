@@ -247,6 +247,18 @@ async function renderApp() {
 function switchTab(tab) { currentTab = tab; renderApp(); }
 function logout() { localStorage.removeItem('moida_admin_v2'); SERVICE_KEY = ''; renderLogin(); }
 
+// ── 공통 유틸 ──
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins + '분 전';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + '시간 전';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + '일 전';
+  return new Date(dateStr).toLocaleDateString('ko');
+}
+
 // ── Analytics ──
 let analyticsDays = 30;
 async function renderAnalytics() {
@@ -854,17 +866,6 @@ async function renderFeedback() {
       case 'in_progress': return '<span class="badge badge-leader">🔧 처리중</span>';
       default: return '<span class="badge" style="background:rgba(255,214,102,.15);color:var(--warn)">⏳ 대기</span>';
     }
-  }
-
-  function timeAgo(dateStr) {
-    const diff = Date.now() - new Date(dateStr).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return mins + '분 전';
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return hrs + '시간 전';
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return days + '일 전';
-    return new Date(dateStr).toLocaleDateString('ko');
   }
 
   document.getElementById('content').innerHTML = `
