@@ -553,7 +553,7 @@ async function renderUsers() {
     <div class="search-bar">
       <input type="text" id="userSearchInput" placeholder="닉네임 또는 이름으로 검색..." value="${userSearch}" oninput="userSearch=this.value">
       <button class="btn btn-primary" onclick="renderUsers()">검색</button>
-      ${userSearch ? '<button class="btn" style="background:var(--border)" onclick="userSearch=\\'\\';renderUsers()">초기화</button>' : ''}
+      ${userSearch ? '<button class="btn" style="background:var(--border)" onclick="userSearch=\'\';renderUsers()">초기화</button>' : ''}
     </div>
     <div style="font-size:13px;color:var(--sub);margin-bottom:12px">총 ${profiles.length}명${filtered.length !== profiles.length ? ' · 검색결과 ' + filtered.length + '명' : ''}</div>
     <div class="table-wrap"><table>
