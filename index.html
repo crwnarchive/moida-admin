@@ -207,6 +207,7 @@ async function renderApp() {
         <button class="tab ${currentTab==='payments'?'active':''}" onclick="switchTab('payments')">납부</button>
         <button class="tab ${currentTab==='celebrations'?'active':''}" onclick="switchTab('celebrations')">경조사</button>
         <button class="tab ${currentTab==='feedback'?'active':''}" onclick="switchTab('feedback')">문의</button>
+        <button class="tab ${currentTab==='analytics'?'active':''}" onclick="switchTab('analytics')">📊 분석</button>
       </div>
       <div id="content">로딩 중...</div>
     </div>`;
@@ -220,6 +221,7 @@ async function renderApp() {
       case 'payments': await renderPayments(); break;
       case 'celebrations': await renderCelebrations(); break;
       case 'feedback': await renderFeedback(); break;
+      case 'analytics': await renderAnalytics(); break;
     }
   } catch (e) {
     document.getElementById('content').innerHTML = `<div class="empty">오류: ${e.message}</div>`;
@@ -228,6 +230,127 @@ async function renderApp() {
 
 function switchTab(tab) { currentTab = tab; renderApp(); }
 function logout() { localStorage.removeItem('moida_admin_v2'); SERVICE_KEY = ''; renderLogin(); }
+
+// ── Analytics ──
+let analyticsDays = 30;
+async function renderAnalytics() {
+  const d = await restRpc('get_analytics_dashboard', { days_back: analyticsDays });
+
+  const eventNameKo = {
+    'login': '로그인', 'sign_up': '회원가입', 'onboarding_complete': '온보딩 완료',
+    'profile_edited': '프로필 수정', 'logout': '로그아웃',
+    'group_created': '모임 생성', 'group_joined': '모임 가입',
+    'post_created': '글 작성', 'poll_created': '투표 생성', 'poll_voted': '투표 참여',
+    'message_sent': '채팅', 'direct_message_sent': 'DM',
+    'event_created': '일정 생성', 'celebration_created': '경조사 등록',
+    'notice_created': '공지 작성', 'invoice_created': '청구서 생성',
+    'ledger_entry_created': '장부 기록', 'payment_recorded': '납부 승인',
+    'share_invite': '초대 공유', 'feature_used': '기능 사용'
+  };
+
+  // DAU 차트
+  const dau = (d.daily_active_users || []).reverse();
+  const maxUsers = Math.max(...dau.map(x => x.users), 1);
+  const dauBars = dau.map(x => {
+    const h = Math.max(Math.round((x.users / maxUsers) * 100), 2);
+    const day = new Date(x.date).toLocaleDateString('ko', {month:'numeric',day:'numeric'});
+    return `<div class="bar-col"><div class="bar-value">${x.users}</div><div class="bar" style="height:${h}%;background:var(--primary)"></div><div class="bar-label">${day}</div></div>`;
+  }).join('');
+
+  // 이벤트 랭킹
+  const events = d.events_by_name || [];
+  const maxEvt = Math.max(...events.map(x => x.count), 1);
+  const eventRows = events.map(e => {
+    const pct = Math.round((e.count / maxEvt) * 100);
+    const name = eventNameKo[e.event_name] || e.event_name;
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <div style="width:120px;font-size:13px;font-weight:600;flex-shrink:0">${name}</div>
+      <div style="flex:1;background:var(--border);border-radius:4px;height:20px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:var(--primary);border-radius:4px;display:flex;align-items:center;padding-left:6px">
+          <span style="font-size:11px;font-weight:700;color:#fff">${e.count}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // 로그인 방법 분포
+  const loginMethods = d.login_methods || [];
+  const loginColors = { 'kakao': '#FEE500', 'apple': '#999', 'phone': 'var(--success)' };
+  const loginTotal = loginMethods.reduce((s, m) => s + m.count, 0) || 1;
+  const loginBar = loginMethods.map(m => {
+    const pct = Math.round((m.count / loginTotal) * 100);
+    const bg = loginColors[m.method] || 'var(--primary)';
+    const txtColor = m.method === 'kakao' ? '#000' : '#fff';
+    return `<div class="dist-seg" style="width:${Math.max(pct,5)}%;background:${bg};color:${txtColor}">${pct}%</div>`;
+  }).join('');
+  const loginLegend = loginMethods.map(m => {
+    const bg = loginColors[m.method] || 'var(--primary)';
+    const label = m.method === 'kakao' ? '카카오' : m.method === 'apple' ? 'Apple' : '전화번호';
+    return `<span><span class="dist-dot" style="background:${bg}"></span>${label} (${m.count})</span>`;
+  }).join('');
+
+  // 최근 이벤트
+  const recent = (d.recent_events || []).slice(0, 30);
+  const recentRows = recent.map(e => {
+    const name = eventNameKo[e.event_name] || e.event_name;
+    const user = e.user_nickname || '-';
+    const time = timeAgo(e.created_at);
+    const paramStr = e.params && Object.keys(e.params).length
+      ? Object.entries(e.params).map(([k,v]) => `${k}: ${v}`).join(', ')
+      : '';
+    return `<tr>
+      <td style="font-weight:600">${name}</td>
+      <td>${user}</td>
+      <td style="font-size:12px;color:var(--sub)">${paramStr}</td>
+      <td style="white-space:nowrap;font-size:12px;color:var(--sub)">${time}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="tab ${analyticsDays===7?'active':''}" onclick="analyticsDays=7;renderAnalytics()">7일</button>
+      <button class="tab ${analyticsDays===30?'active':''}" onclick="analyticsDays=30;renderAnalytics()">30일</button>
+      <button class="tab ${analyticsDays===90?'active':''}" onclick="analyticsDays=90;renderAnalytics()">90일</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="label">오늘 활성 유저</div>
+        <div class="value">${d.today_users || 0}</div>
+        <div class="trend" style="color:var(--sub)">이벤트 ${d.today_events || 0}건</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">${analyticsDays}일 활성 유저</div>
+        <div class="value">${d.unique_users || 0}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">${analyticsDays}일 총 이벤트</div>
+        <div class="value">${(d.total_events || 0).toLocaleString()}</div>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="emoji">📈</span> 일별 활성 유저 (DAU)</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+      ${dau.length ? `<div class="bar-chart">${dauBars}</div>` : '<div class="empty">데이터 없음</div>'}
+    </div>
+
+    <div class="section-title"><span class="emoji">🏆</span> 기능별 사용량</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+      ${events.length ? eventRows : '<div class="empty">데이터 없음</div>'}
+    </div>
+
+    <div class="section-title"><span class="emoji">🔐</span> 로그인 방법</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+      ${loginMethods.length ? `<div class="dist-bar">${loginBar}</div><div class="dist-legend">${loginLegend}</div>` : '<div class="empty">데이터 없음</div>'}
+    </div>
+
+    <div class="section-title"><span class="emoji">🕐</span> 최근 활동</div>
+    ${recent.length ? `<div class="table-wrap"><table>
+      <tr><th>이벤트</th><th>유저</th><th>상세</th><th>시간</th></tr>
+      ${recentRows}
+    </table></div>` : '<div class="empty">데이터 없음</div>'}
+  `;
+}
 
 // ── Dashboard ──
 async function renderDashboard() {
