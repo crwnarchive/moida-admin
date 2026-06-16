@@ -81,6 +81,20 @@
   .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
   .refresh-btn { background: none; border: 1px solid var(--border); color: var(--sub); padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 13px; }
   .refresh-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+  .search-bar input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); font-size: 14px; }
+  .search-bar input::placeholder { color: var(--sub); }
+  .user-detail { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
+  .user-detail h3 { margin-bottom: 12px; }
+  .user-detail .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .user-detail .info-item { font-size: 13px; }
+  .user-detail .info-item .label { color: var(--sub); font-size: 11px; margin-bottom: 2px; }
+  .textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); font-size: 14px; font-family: inherit; resize: vertical; min-height: 80px; }
+  .announce-form { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 20px; }
+  .announce-form h3 { margin-bottom: 16px; }
+  .announce-form input, .announce-form textarea { width: 100%; margin-bottom: 12px; }
+  .announce-form input { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 14px; }
+  .announce-form textarea { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 14px; font-family: inherit; resize: vertical; min-height: 100px; }
   .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
 </style>
 </head>
@@ -207,6 +221,7 @@ async function renderApp() {
         <button class="tab ${currentTab==='payments'?'active':''}" onclick="switchTab('payments')">납부</button>
         <button class="tab ${currentTab==='celebrations'?'active':''}" onclick="switchTab('celebrations')">경조사</button>
         <button class="tab ${currentTab==='feedback'?'active':''}" onclick="switchTab('feedback')">문의</button>
+        <button class="tab ${currentTab==='announce'?'active':''}" onclick="switchTab('announce')">📢 공지</button>
         <button class="tab ${currentTab==='analytics'?'active':''}" onclick="switchTab('analytics')">📊 분석</button>
       </div>
       <div id="content">로딩 중...</div>
@@ -221,6 +236,7 @@ async function renderApp() {
       case 'payments': await renderPayments(); break;
       case 'celebrations': await renderCelebrations(); break;
       case 'feedback': await renderFeedback(); break;
+      case 'announce': await renderAnnounce(); break;
       case 'analytics': await renderAnalytics(); break;
     }
   } catch (e) {
@@ -512,23 +528,54 @@ async function renderDashboard() {
 }
 
 // ── Users (profiles) ──
+let userSearch = '';
 async function renderUsers() {
   const profiles = await restGet('profiles', 'select=id,nickname,full_name,gender,birth_date,created_at&order=created_at.desc');
+  const members = await restGet('members', 'select=user_id,group:groups(name),role,status').catch(() => []);
+  
+  // Build user-group map
+  const userGroups = {};
+  members.forEach(m => {
+    if (!userGroups[m.user_id]) userGroups[m.user_id] = [];
+    userGroups[m.user_id].push({ name: m.group?.name || '-', role: m.role, status: m.status });
+  });
+
+  let filtered = profiles;
+  if (userSearch) {
+    const q = userSearch.toLowerCase();
+    filtered = profiles.filter(p => 
+      (p.nickname || '').toLowerCase().includes(q) || 
+      (p.full_name || '').toLowerCase().includes(q)
+    );
+  }
 
   document.getElementById('content').innerHTML = `
+    <div class="search-bar">
+      <input type="text" id="userSearchInput" placeholder="닉네임 또는 이름으로 검색..." value="${userSearch}" oninput="userSearch=this.value">
+      <button class="btn btn-primary" onclick="renderUsers()">검색</button>
+      ${userSearch ? '<button class="btn" style="background:var(--border)" onclick="userSearch=\\'\\';renderUsers()">초기화</button>' : ''}
+    </div>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:12px">총 ${profiles.length}명${filtered.length !== profiles.length ? ' · 검색결과 ' + filtered.length + '명' : ''}</div>
     <div class="table-wrap"><table>
-      <tr><th>닉네임</th><th>이름</th><th>성별</th><th>생년월일</th><th>가입일</th><th>액션</th></tr>
-      ${profiles.map(p => `<tr>
-        <td>${p.nickname || '-'}</td>
+      <tr><th>닉네임</th><th>이름</th><th>성별</th><th>모임</th><th>가입일</th><th>액션</th></tr>
+      ${filtered.map(p => {
+        const groups = userGroups[p.id] || [];
+        const groupStr = groups.length ? groups.map(g => `<span class="badge badge-${g.role}" style="margin:1px">${g.name} (${g.role})</span>`).join(' ') : '<span style="color:var(--sub)">없음</span>';
+        return `<tr>
+        <td><strong>${p.nickname || '-'}</strong></td>
         <td>${p.full_name || '-'}</td>
-        <td>${p.gender || '-'}</td>
-        <td>${p.birth_date || '-'}</td>
-        <td>${new Date(p.created_at).toLocaleDateString('ko')}</td>
+        <td>${p.gender === 'male' ? '남' : p.gender === 'female' ? '여' : '-'}</td>
+        <td>${groupStr}</td>
+        <td style="white-space:nowrap">${new Date(p.created_at).toLocaleDateString('ko')}</td>
         <td><div class="actions">
-          <button class="btn btn-danger btn-sm" onclick="deleteUser('${p.id}','${p.nickname||p.full_name||p.id}')">삭제</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteUser('${p.id}','${(p.nickname||p.full_name||p.id).replace(/'/g,"\\'")}')">삭제</button>
         </div></td>
-      </tr>`).join('')}
+      </tr>`;
+      }).join('')}
     </table></div>`;
+  
+  const input = document.getElementById('userSearchInput');
+  if (input) input.addEventListener('keydown', e => { if(e.key==='Enter') renderUsers(); });
 }
 
 async function deleteUser(id, name) {
@@ -668,6 +715,105 @@ async function deleteCelebration(id) {
       await restDelete('celebrations', 'id=eq.' + id);
       toast('삭제 완료');
       renderApp();
+    } catch(e) { toast('실패: ' + e.message); }
+  });
+}
+
+// ── Announce (공지 발송) ──
+async function renderAnnounce() {
+  const announcements = await restGet('admin_announcements', 'select=*&order=created_at.desc&limit=20').catch(() => []);
+
+  const targetLabel = { all: '전체', leaders: '회장만', treasurers: '총무만' };
+
+  document.getElementById('content').innerHTML = `
+    <div class="announce-form">
+      <h3>📢 공지 발송</h3>
+      <input type="text" id="annTitle" placeholder="제목 (예: 서비스 점검 안내)">
+      <textarea id="annBody" placeholder="공지 내용을 입력하세요..."></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+        <span style="font-size:13px;color:var(--sub)">대상:</span>
+        <select id="annTarget" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px">
+          <option value="all">전체 유저</option>
+          <option value="leaders">회장만</option>
+          <option value="treasurers">총무만</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="sendAnnouncement()" style="width:100%;padding:14px">공지 발송하기</button>
+    </div>
+
+    <div class="section-title"><span class="emoji">📋</span> 발송 내역</div>
+    ${!announcements.length ? '<div class="empty">발송된 공지가 없어요</div>' : `
+    <div class="table-wrap"><table>
+      <tr><th>제목</th><th>내용</th><th>대상</th><th>발송일</th><th>액션</th></tr>
+      ${announcements.map(a => `<tr>
+        <td style="font-weight:600">${(a.title || '').replace(/</g,'&lt;')}</td>
+        <td style="max-width:300px;white-space:pre-wrap;word-break:break-word;font-size:13px">${(a.body || '').replace(/</g,'&lt;')}</td>
+        <td><span class="badge badge-leader">${targetLabel[a.target] || a.target}</span></td>
+        <td style="white-space:nowrap;font-size:12px;color:var(--sub)">${new Date(a.created_at).toLocaleString('ko')}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteAnnouncement('${a.id}')">삭제</button></td>
+      </tr>`).join('')}
+    </table></div>`}
+  `;
+}
+
+async function sendAnnouncement() {
+  const title = document.getElementById('annTitle').value.trim();
+  const body = document.getElementById('annBody').value.trim();
+  const target = document.getElementById('annTarget').value;
+
+  if (!title || !body) { toast('제목과 내용을 모두 입력하세요'); return; }
+
+  showConfirm('공지 발송', `<b>${target === 'all' ? '전체 유저' : target === 'leaders' ? '회장들' : '총무들'}</b>에게 공지를 발송합니다.<br><br>제목: ${title}`, async () => {
+    try {
+      // Save to admin_announcements
+      const res = await fetch(SUPABASE_URL + '/rest/v1/admin_announcements', {
+        method: 'POST',
+        headers: {
+          'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY,
+          'Content-Type': 'application/json', 'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({ title, body, target })
+      });
+      if (!res.ok) throw new Error('저장 실패: ' + res.status);
+
+      // Get target users (push tokens)
+      let userQuery = 'select=user_id,role';
+      if (target === 'leaders') userQuery += '&role=eq.leader';
+      else if (target === 'treasurers') userQuery += '&role=eq.treasurer';
+      const targetMembers = await restGet('members', userQuery).catch(() => []);
+      const userIds = [...new Set(targetMembers.map(m => m.user_id))];
+
+      // Insert notifications for each user
+      if (userIds.length > 0) {
+        const notifications = userIds.map(uid => ({
+          user_id: uid,
+          type: 'admin_announcement',
+          title: title,
+          body: body
+        }));
+        
+        await fetch(SUPABASE_URL + '/rest/v1/notifications', {
+          method: 'POST',
+          headers: {
+            'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY,
+            'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(notifications)
+        }).catch(() => {});
+      }
+
+      toast(`공지 발송 완료 (${userIds.length}명)`);
+      renderAnnounce();
+    } catch(e) { toast('발송 실패: ' + e.message); }
+  });
+}
+
+async function deleteAnnouncement(id) {
+  showConfirm('공지 삭제', '이 공지를 삭제하시겠어요?', async () => {
+    try {
+      await restDelete('admin_announcements', 'id=eq.' + id);
+      toast('삭제 완료');
+      renderAnnounce();
     } catch(e) { toast('실패: ' + e.message); }
   });
 }
