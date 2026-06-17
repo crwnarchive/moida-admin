@@ -877,16 +877,16 @@ async function renderPreRegistrations() {
 
     <div class="section-title"><span class="emoji">📋</span> 예약 목록</div>
     ${!regs.length ? '<div class="empty">아직 사전 예약이 없어요</div>' : ''}
-    ${regs.length ? '<div class="table-wrap"><table>' +
-      '<tr><th>#</th><th>구분</th><th>이메일 / 전화번호</th><th>등록일</th><th>액션</th></tr>' +
-      regs.map((r, i) => '<tr>' +
-        '<td style="color:var(--sub)">' + (i + 1) + '</td>' +
-        '<td>' + (r.email ? '<span class="badge badge-leader">이메일</span>' : '<span class="badge badge-active">전화번호</span>') + '</td>' +
-        '<td style="font-weight:600">' + (r.email || r.phone || '-') + '</td>' +
-        '<td style="white-space:nowrap;font-size:12px;color:var(--sub)">' + new Date(r.created_at).toLocaleString('ko') + '</td>' +
-        '<td><button class="btn btn-danger btn-sm" onclick="deletePreReg(\\'' + r.id + '\\')">삭제</button></td>' +
-      '</tr>').join('') +
-    '</table></div>' : ''}
+    ${regs.length ? `<div class="table-wrap"><table>
+      <tr><th>#</th><th>구분</th><th>이메일 / 전화번호</th><th>등록일</th><th>액션</th></tr>
+      ${regs.map((r, i) => `<tr>
+        <td style="color:var(--sub)">${i + 1}</td>
+        <td>${r.email ? '<span class="badge badge-leader">이메일</span>' : '<span class="badge badge-active">전화번호</span>'}</td>
+        <td style="font-weight:600">${r.email || r.phone || '-'}</td>
+        <td style="white-space:nowrap;font-size:12px;color:var(--sub)">${new Date(r.created_at).toLocaleString('ko')}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deletePreReg('${r.id}')">삭제</button></td>
+      </tr>`).join('')}
+    </table></div>` : ''}
 
     ${regs.length ? '<div style="margin-top:16px;display:flex;gap:8px"><button class="btn btn-primary" onclick="exportPreRegs()">📥 CSV 다운로드</button></div>' : ''}
   `;
