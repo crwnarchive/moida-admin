@@ -391,9 +391,12 @@ async function renderDashboard() {
   // 거래액 직접 조회
   const txStats = await restGet('transactions', 'select=amount');
   const totalAmount = txStats.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-  const txThisWeek = await restGet('transactions', `select=amount&created_at=gte.${new Date(Date.now()-7*86400000).toISOString()}`);
+  const now = new Date();
+  const weekAgo = new Date(now - 7*86400000).toISOString().slice(0,19);
+  const twoWeekAgo = new Date(now - 14*86400000).toISOString().slice(0,19);
+  const txThisWeek = await restGet('transactions', 'select=amount&created_at=gte.' + weekAgo);
   const weekAmount = txThisWeek.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-  const txPrevWeek = await restGet('transactions', `select=amount&created_at=gte.${new Date(Date.now()-14*86400000).toISOString()}&created_at=lt.${new Date(Date.now()-7*86400000).toISOString()}`);
+  const txPrevWeek = await restGet('transactions', 'select=amount&created_at=gte.' + twoWeekAgo + '&created_at=lt.' + weekAgo);
   const prevWeekAmount = txPrevWeek.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   // Helpers
