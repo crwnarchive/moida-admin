@@ -387,6 +387,14 @@ async function renderAnalytics() {
 // ── Dashboard ──
 async function renderDashboard() {
   const d = await restRpc('get_admin_dashboard');
+  
+  // 거래액 직접 조회
+  const txStats = await restGet('transactions', 'select=amount');
+  const totalAmount = txStats.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const txThisWeek = await restGet('transactions', `select=amount&created_at=gte.${new Date(Date.now()-7*86400000).toISOString()}`);
+  const weekAmount = txThisWeek.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const txPrevWeek = await restGet('transactions', `select=amount&created_at=gte.${new Date(Date.now()-14*86400000).toISOString()}&created_at=lt.${new Date(Date.now()-7*86400000).toISOString()}`);
+  const prevWeekAmount = txPrevWeek.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
   // Helpers
   function trend(curr, prev, label) {
@@ -446,6 +454,12 @@ async function renderDashboard() {
         <div class="label">7일 미접속 ⚠️</div>
         <div class="value" style="color:${inactivePercent > 20 ? 'var(--danger)' : 'var(--warn)'}">${d.inactive_7d}</div>
         <div class="trend" style="color:var(--sub)">${inactivePercent}% of total</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">💰 총 거래액</div>
+        <div class="value" style="color:var(--success)">${totalAmount >= 10000 ? Math.floor(totalAmount/10000).toLocaleString() + '만' : totalAmount.toLocaleString()}원</div>
+        <div class="trend" style="color:var(--sub)">이번주 +${weekAmount >= 10000 ? Math.floor(weekAmount/10000).toLocaleString() + '만' : weekAmount.toLocaleString()}원</div>
+        ${weekAmount !== prevWeekAmount ? `<div class="trend ${weekAmount > prevWeekAmount ? 'trend-up' : 'trend-down'}">${weekAmount > prevWeekAmount ? '↑' : '↓'} ${Math.abs(weekAmount - prevWeekAmount).toLocaleString()}원 vs 전주</div>` : ''}
       </div>
     </div>
 
