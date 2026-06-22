@@ -223,6 +223,7 @@ async function renderApp() {
         <button class="tab ${currentTab==='feedback'?'active':''}" onclick="switchTab('feedback')">문의</button>
         <button class="tab ${currentTab==='announce'?'active':''}" onclick="switchTab('announce')">📢 공지</button>
         <button class="tab ${currentTab==='analytics'?'active':''}" onclick="switchTab('analytics')">📊 분석</button>
+        <button class="tab ${currentTab==='landing'?'active':''}" onclick="switchTab('landing')">🌐 랜딩</button>
         <button class="tab ${currentTab==='prereg'?'active':''}" onclick="switchTab('prereg')">🔔 사전예약</button>
       </div>
       <div id="content">로딩 중...</div>
@@ -239,6 +240,7 @@ async function renderApp() {
       case 'feedback': await renderFeedback(); break;
       case 'announce': await renderAnnounce(); break;
       case 'analytics': await renderAnalytics(); break;
+      case 'landing': await renderLanding(); break;
       case 'prereg': await renderPreRegistrations(); break;
     }
   } catch (e) {
@@ -1004,6 +1006,236 @@ async function deleteFeedback(id) {
       renderFeedback();
     } catch(e) { toast('실패: ' + e.message); }
   });
+}
+
+// ── 랜딩 대시보드 ──
+let landingDays = 7;
+
+async function renderLanding() {
+  const c = document.getElementById('content');
+  c.innerHTML = '<div class="empty">로딩 중...</div>';
+  
+  const now = new Date();
+  const from = new Date(now - landingDays * 86400000).toISOString();
+  
+  // 전체 이벤트 가져오기
+  const events = await restGet('landing_events', `created_at=gte.${from}&order=created_at.desc&limit=5000`);
+  
+  const pageviews = events.filter(e => e.event_type === 'pageview');
+  const clicks = events.filter(e => e.event_type === 'app_store_click');
+  const sections = events.filter(e => e.event_type === 'section_view');
+  
+  // 유니크 세션
+  const uniqueSessions = new Set(pageviews.map(e => e.session_id)).size;
+  
+  // 전환율
+  const convRate = pageviews.length > 0 ? ((clicks.length / pageviews.length) * 100).toFixed(1) : '0.0';
+  
+  // 디바이스별
+  const devices = {};
+  pageviews.forEach(e => { devices[e.device] = (devices[e.device] || 0) + 1; });
+  
+  // 유입 경로별
+  const referrers = {};
+  pageviews.forEach(e => {
+    let ref = e.referrer || 'direct';
+    if (ref !== 'direct') {
+      try { ref = new URL(ref).hostname; } catch(x) {}
+    }
+    if (ref.includes('kakaotalk') || ref.includes('kakao')) ref = '카카오톡';
+    else if (ref.includes('instagram')) ref = '인스타그램';
+    else if (ref.includes('google')) ref = '구글';
+    else if (ref.includes('naver')) ref = '네이버';
+    else if (ref.includes('t.co') || ref.includes('twitter')) ref = 'X(트위터)';
+    else if (ref === 'direct' || ref === '') ref = '직접 접속';
+    referrers[ref] = (referrers[ref] || 0) + 1;
+  });
+  
+  // UTM 소스별
+  const utmSources = {};
+  pageviews.filter(e => e.utm_source).forEach(e => {
+    utmSources[e.utm_source] = (utmSources[e.utm_source] || 0) + 1;
+  });
+  
+  // 클릭 위치별
+  const clickLocs = {};
+  clicks.forEach(e => {
+    const loc = e.page_path?.replace('/', '') || 'unknown';
+    clickLocs[loc] = (clickLocs[loc] || 0) + 1;
+  });
+  
+  // 일별 추이
+  const daily = {};
+  const dailyClicks = {};
+  pageviews.forEach(e => {
+    const d = e.created_at.slice(0, 10);
+    daily[d] = (daily[d] || 0) + 1;
+  });
+  clicks.forEach(e => {
+    const d = e.created_at.slice(0, 10);
+    dailyClicks[d] = (dailyClicks[d] || 0) + 1;
+  });
+  
+  // 시간대별
+  const hourly = Array(24).fill(0);
+  pageviews.forEach(e => {
+    const h = new Date(e.created_at).getHours();
+    hourly[h]++;
+  });
+  const maxHourly = Math.max(...hourly, 1);
+  
+  const sortedRefs = Object.entries(referrers).sort((a,b) => b[1] - a[1]);
+  const sortedDevices = Object.entries(devices).sort((a,b) => b[1] - a[1]);
+  const sortedUtm = Object.entries(utmSources).sort((a,b) => b[1] - a[1]);
+  const sortedClickLocs = Object.entries(clickLocs).sort((a,b) => b[1] - a[1]);
+  const sortedDaily = Object.entries(daily).sort((a,b) => a[0].localeCompare(b[0]));
+  const maxDaily = Math.max(...sortedDaily.map(d => d[1]), 1);
+  
+  const deviceColors = { iOS: '#3182F6', Android: '#34C759', Mac: '#8B5CF6', Windows: '#FF9F0A', Other: '#8B8F9E' };
+  const totalDevices = Object.values(devices).reduce((a,b) => a+b, 0) || 1;
+  
+  c.innerHTML = `
+    <div style="margin-bottom:16px">
+      <button class="tab ${landingDays===1?'active':''}" onclick="landingDays=1;renderLanding()">오늘</button>
+      <button class="tab ${landingDays===7?'active':''}" onclick="landingDays=7;renderLanding()">7일</button>
+      <button class="tab ${landingDays===30?'active':''}" onclick="landingDays=30;renderLanding()">30일</button>
+      <button class="tab ${landingDays===90?'active':''}" onclick="landingDays=90;renderLanding()">90일</button>
+    </div>
+    
+    <div class="stats">
+      <div class="stat-card">
+        <div class="label">총 방문</div>
+        <div class="value">${pageviews.length.toLocaleString()}</div>
+        <div class="trend" style="color:var(--sub)">${landingDays}일간</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">순 방문자</div>
+        <div class="value">${uniqueSessions.toLocaleString()}</div>
+        <div class="trend" style="color:var(--sub)">유니크 세션</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">앱스토어 클릭</div>
+        <div class="value" style="color:var(--primary)">${clicks.length}</div>
+        <div class="trend" style="color:var(--sub)">다운로드 링크</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">전환율</div>
+        <div class="value" style="color:${parseFloat(convRate)>=5?'var(--success)':'var(--warn)'}">${convRate}%</div>
+        <div class="trend" style="color:var(--sub)">방문→클릭</div>
+      </div>
+    </div>
+    
+    <!-- 일별 추이 차트 -->
+    <div class="section-title">📈 일별 방문 추이</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px">
+      <div class="bar-chart" style="height:140px">
+        ${sortedDaily.map(([d, cnt]) => `
+          <div class="bar-col">
+            <div class="bar-value">${cnt}</div>
+            <div class="bar" style="height:${(cnt/maxDaily)*100}%;background:linear-gradient(180deg,#3182F6,#00D2C8);border-radius:4px 4px 0 0"></div>
+            <div class="bar-label">${d.slice(5)}</div>
+            ${dailyClicks[d] ? '<div style="font-size:9px;color:var(--primary)">🔗'+dailyClicks[d]+'</div>' : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- 시간대별 -->
+    <div class="section-title">🕐 시간대별 방문</div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px">
+      <div class="bar-chart" style="height:100px">
+        ${hourly.map((cnt, h) => `
+          <div class="bar-col">
+            <div class="bar" style="height:${(cnt/maxHourly)*100}%;background:${h>=9&&h<=22?'#3182F6':'#2a2d3a'}"></div>
+            <div class="bar-label">${h%6===0?h+'시':''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <!-- 유입 경로 -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+        <div class="section-title" style="margin-top:0">🔗 유입 경로</div>
+        ${sortedRefs.length === 0 ? '<div style="color:var(--sub);font-size:13px">아직 데이터 없음</div>' : 
+          sortedRefs.map(([ref, cnt]) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:14px">${ref}</span>
+              <span style="font-size:14px;font-weight:700">${cnt} <span style="font-size:11px;color:var(--sub)">(${((cnt/pageviews.length)*100).toFixed(0)}%)</span></span>
+            </div>
+          `).join('')}
+      </div>
+      
+      <!-- 디바이스 -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+        <div class="section-title" style="margin-top:0">📱 디바이스</div>
+        <div class="dist-bar" style="margin-bottom:12px">
+          ${sortedDevices.map(([dev, cnt]) => `
+            <div class="dist-seg" style="width:${(cnt/totalDevices)*100}%;background:${deviceColors[dev]||'#8B8F9E'}">${dev}</div>
+          `).join('')}
+        </div>
+        ${sortedDevices.map(([dev, cnt]) => `
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px">
+            <span><span class="dist-dot" style="background:${deviceColors[dev]||'#8B8F9E'}"></span>${dev}</span>
+            <span style="font-weight:700">${cnt} (${((cnt/totalDevices)*100).toFixed(0)}%)</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <!-- UTM 소스 -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+        <div class="section-title" style="margin-top:0">🏷 UTM 소스</div>
+        ${sortedUtm.length === 0 ? '<div style="color:var(--sub);font-size:13px">UTM 파라미터 없음</div>' :
+          sortedUtm.map(([src, cnt]) => `
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:14px">${src}</span>
+              <span style="font-weight:700">${cnt}</span>
+            </div>
+          `).join('')}
+      </div>
+      
+      <!-- 클릭 위치 -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px">
+        <div class="section-title" style="margin-top:0">🎯 클릭 위치</div>
+        ${sortedClickLocs.length === 0 ? '<div style="color:var(--sub);font-size:13px">클릭 데이터 없음</div>' :
+          sortedClickLocs.map(([loc, cnt]) => {
+            const label = loc === 'hero' ? '🦸 히어로 버튼' : loc === 'sticky_bar' ? '📌 하단 고정바' : loc === 'cta_banner' ? '🎯 CTA 배너' : loc;
+            return `
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+                <span style="font-size:14px">${label}</span>
+                <span style="font-weight:700">${cnt}</span>
+              </div>
+            `;
+          }).join('')}
+      </div>
+    </div>
+    
+    <!-- 최근 방문 로그 -->
+    <div class="section-title" style="margin-top:20px">📋 최근 방문 (${Math.min(events.length, 20)}건)</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>시간</th><th>이벤트</th><th>유입</th><th>디바이스</th><th>UTM</th>
+        </tr></thead>
+        <tbody>
+          ${events.slice(0, 20).map(e => {
+            let ref = e.referrer || 'direct';
+            try { if (ref !== 'direct') ref = new URL(ref).hostname; } catch(x) {}
+            const typeLabel = e.event_type === 'pageview' ? '👁 방문' : e.event_type === 'app_store_click' ? '🔗 클릭' : '📍 스크롤';
+            return `<tr>
+              <td>${timeAgo(e.created_at)}</td>
+              <td>${typeLabel}</td>
+              <td style="font-size:12px">${ref}</td>
+              <td>${e.device || '-'}</td>
+              <td style="font-size:12px">${e.utm_source || '-'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 // ── Init ──
