@@ -1347,10 +1347,13 @@ async function renderLanding() {
   const c = document.getElementById('content');
   c.innerHTML = '<div class="empty">로딩 중...</div>';
   
-  // 한국 시간(KST, UTC+9) 기준으로 계산
+  // 한국 시간(KST, UTC+9) 기준 — 자정 기준 캘린더 일 단위
   const nowKST = new Date(Date.now() + 9 * 3600000);
-  const fromKST = new Date(nowKST - landingDays * 86400000);
-  const from = new Date(fromKST - 9 * 3600000).toISOString(); // KST 기준 날짜를 UTC로 변환해서 쿼리
+  // KST 기준 오늘 자정 (00:00:00)
+  const todayMidnightKST = new Date(Date.UTC(nowKST.getUTCFullYear(), nowKST.getUTCMonth(), nowKST.getUTCDate()));
+  // landingDays=1 → 오늘 자정부터, 7 → 7일 전 자정부터
+  const fromKST = new Date(todayMidnightKST - (landingDays - 1) * 86400000);
+  const from = new Date(fromKST - 9 * 3600000).toISOString(); // KST 자정을 UTC로 변환
   
   // 전체 이벤트 가져오기
   const events = await restGet('landing_events', `created_at=gte.${from}&order=created_at.desc&limit=5000`);
